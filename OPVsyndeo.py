@@ -16,7 +16,36 @@ import urllib.request
 class OPVsyndeoApp(object):
 
     # ###########################################################
+    # (model) default configuration
+    # ###########################################################
+
+    defaultconfig = {
+        'sshkey'      : os.environ['HOME'] + '/.ssh/id_rsa',
+        'sshoptions'  : '-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oBatchMode=yes -oPasswordAuthentication=no -oConnectTimeout=20',
+        'sshuttlecmd' : 'sshuttle --disable-ipv6 --dns --python python3',
+        'username'    : os.environ['USER'],
+        'networks'    : {
+        'ykt': {
+            'jumphost': '9.2.130.16',
+            'nets': [ '100.64.0.0/16', '10.42.0.0/16' ],
+            'testurl': 'http://100.64.0.255/'
+        },
+            'pokstg': {
+                'jumphost':'9.47.228.15',
+                'nets': [ '192.168.92.0/22' ],
+                'testurl': 'http://192.168.92.1/'
+        },
+            'pokprod': {
+                'jumphost': '9.47.228.16',
+                'nets': [ '192.168.96.0/22' ],
+                'testurl': 'http://192.168.98.10'
+            }
+        }
+    }
+    
+    # ###########################################################
     # application initialization
+    # -----------------------------------------------------------
     # "shouldrun" is a dictionary that determines whether a network sshuttle should be active or not.
     # "sshuttleprocesses" is the dictionary of all sshuttle "subprocess" objects
     # "sshuttlefiles" is the dictionary of all log files attached to sshuttle processes
@@ -25,35 +54,35 @@ class OPVsyndeoApp(object):
 
     def __init__(self):
         self.app = rumps.App("OPVsyndeo", title="", icon='icons/gray.png', quit_button=None)
-        self.config  = self.loadconfig()
+        self.config  = self.config_load()
+        self.config_check()
         self.shouldrun = {}
         self.menuitems = {}
-        self.sshuttleprocesses = {}
+        self.sshuttle_pids = {}
         self.sshuttlefiles = {}
 
         # create all menu items
         menulist = []
         for netname in self.config['networks'].keys():
-            menuitem = rumps.MenuItem(title=netname, callback=self.toggleActive)
+            menuitem = rumps.MenuItem(title="%-10.10s(%s)"%(netname,'idle'), callback=self.toggleActive)
             menuitem.enabled                = True
-            menuitem.font                   = "fixed"
             menuitem.netname                = netname
             self.menuitems[netname]         = menuitem
             menulist.append(menuitem)
             self.shouldrun[netname]         = False
-            self.sshuttleprocesses[netname] = None
+            self.sshuttle_pids[netname] = None
             self.sshuttlefiles[netname]     = None
+        # horizontal separator
+        menulist.append(None)
 
         # debugging menu item
         menuitem = rumps.MenuItem(title='Show debug console[s]', callback=self.clickDebug)
         menuitem.enabled = True
-        menuitem.font = "fixed"
         menulist.append(menuitem)
 
         # quit menu item
         menuitem = rumps.MenuItem(title="Quit", callback=self.quit)
         menuitem.enabled = True
-        menuitem.font = "fixed"
         menulist.append(menuitem)
 
         # remove all log files from previous runs
@@ -71,7 +100,7 @@ class OPVsyndeoApp(object):
         self.app.menu=menulist
         
     # ###########################################################
-    # RUMPS function: run. start the timer, then give up control
+    # (controller) RUMPS function: run. start the timer, then give up control
     # ###########################################################
 
     def run(self):
@@ -79,7 +108,7 @@ class OPVsyndeoApp(object):
         self.app.run()
 
     # ###########################################################
-    # RUMPS function: toggle a menu item
+    # (controller) RUMPS function: toggle a menu item
     # this gets called when any menu item is clicked upon.
     # we toggle the "shouldrun" boolean for the item then sync status
     # ###########################################################
@@ -90,7 +119,7 @@ class OPVsyndeoApp(object):
         self.updatestatus()
 
     # ###########################################################
-    # RUMPS function: start debug
+    # (controller) RUMPS function: start debug
     # this forces debug windows for all active connections.
     # ###########################################################
 
@@ -101,56 +130,79 @@ class OPVsyndeoApp(object):
                 os.system(cmd)
 
     # ###########################################################
-    # RUMPS function: quit
+    # (controller) RUMPS function: quit
     # ###########################################################
+
     def quit(self, menuitem):
         for netname in self.config['networks'].keys():
-            self.killprocess(netname)
+            self.process_kill(netname)
         rumps.quit_application()
 
     # ###########################################################
-    # RUMPS function: timer tick
+    # (controller) RUMPS function: timer tick
     # ###########################################################
 
     def on_tick(self, _):
         self.updatestatus()
 
     # ###########################################################
-    # load configuration (hardcoded for now)
+    # (model) load configuration (hardcoded for now)
     # ###########################################################
-    def loadconfig (self):
-        try:
-            username = os.environ['USER']
-            homedir  = os.environ['HOME']
-        except:
+    
+    def config_load (self):
+        self.configdir  = os.environ['HOME'] + '/Library/Application Support/OPVsyndeo'
+        self.configfile = self.configdir + '/OPVsyndeo.json'
+        if os.access(self.configfile, os.R_OK):
+            try:
+                fp = open(self.configfile, 'r')
+                return json.load (fp)
+            except Exception as e:
+                rumps.alert (title="Cannot read config file %s"%(self.configfile),
+                             message=str(e),
+                             ok=None,
+                             cancel=None)
+                exit(1)
+        else:
+            defconfigstring = json.dumps(self.defaultconfig, indent=2)
+            rumps.alert(title="config file not found. Writing a default.",
+                        message=self.configfile,
+                        ok=None,
+                        cancel=None)
+            try:
+                os.makedirs(self.configdir, exist_ok=True)
+                fp = open(self.configfile, 'w')
+                fp.write(defconfigstring)
+                fp.close()
+            except Exception as e:
+                rumps.alert(title="Failed to write config file",
+                            message=self.configfile + ": " + str(e),
+                            ok = None,
+                            cancel=None)
+                exit(1)
+            return self.defaultconfig
+
+    # ###########################################################
+    # (model) check the configuration for consistency
+    # ###########################################################
+
+    def config_check (self):
+        if 'sshkey' not in self.config:
+            rumps.alert (title="ssh key not defined in configuration",
+                         ok = None,
+                         cancel = None)
             exit(1)
-        return {
-            'sshkey' : homedir + '/.ssh/id_rsa',
-            'sshoptions': '-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oBatchMode=yes -oPasswordAuthentication=no -oConnectTimeout=20',
-            'sshuttlecmd' : 'sshuttle --disable-ipv6 --dns --python python3',
-            'username' : username,
-            'networks' : {
-                'ykt': {
-                    'jumphost': '9.2.130.16',
-                    'nets': [ '100.64.0.0/16', '10.42.0.0/16' ],
-                    'testurl': 'http://100.64.0.255/'
-                },
-                'pokstg': {
-                    'jumphost':'9.47.228.15',
-                    'nets': [ '192.168.92.0/22' ],
-                    'testurl': 'http://192.168.92.1/'
-                },
-                'pokprod': {
-                    'jumphost': '9.47.228.16',
-                    'nets': [ '192.168.96.0/22' ],
-                    'testurl': 'http://192.168.98.10'
-                }
-            }
-        }
+        if not os.access(self.config['sshkey'], os.R_OK):
+            rumps.alert (title="ssh key is not readable",
+                         message=self.config['sshkey'],
+                         ok = None,
+                         cancel = None)
+            exit(1)
+        
     
     # ###########################################################
-    # this is the main status reconciler.
+    # (model) main status reconciler
     # ###########################################################
+
     def updatestatus(self):
         symlist = { 'bad': "🔴", 'transient': "🟡", 'running': "🟢",  'idle': "🔘" }
         idle = False
@@ -158,7 +210,7 @@ class OPVsyndeoApp(object):
         transient = False
         for netname in self.shouldrun.keys():
             if self.shouldrun[netname]:
-                if self.checkprocess(netname):
+                if self.process_check(netname):
                     status = "run 🟢"
                     idle = False
                     running = True
@@ -166,17 +218,17 @@ class OPVsyndeoApp(object):
                     status = "starting🟡"
                     idle = False
                     transient = True
-                    self.startprocess(netname)
+                    self.process_start(netname)
             else:
-                if self.checkprocess(netname):
+                if self.process_check(netname):
                     status = "stopping🟡"
                     idle = False
                     transient = True
-                    self.killprocess(netname)
+                    self.process_kill(netname)
                 else:
                     status = "idle🔘"
                     idle = True
-            self.menuitems[netname].title = netname + " (" + status + ")"
+            self.menuitems[netname].title = "%-10.10s(%s)"%(netname,status)
 
         # determine global status.
         # if any items are transient, we are yellow
@@ -187,12 +239,12 @@ class OPVsyndeoApp(object):
         else: self.app.icon = 'icons/gray.png'
         
     # ###########################################################
-    # start a sshuttle process.
+    # (model) start a sshuttle process.
     # composes the command line and calls popen.
     # ###########################################################
 
-    def startprocess (self, netname):
-        if self.sshuttleprocesses[netname] is not None: return
+    def process_start (self, netname):
+        if self.sshuttle_pids[netname] is not None: return
         
         username = self.config['username']
         jhost = self.config['networks'][netname]['jumphost']
@@ -209,9 +261,13 @@ class OPVsyndeoApp(object):
         cmd.append(username + '@' + jhost)
         cmd.extend(nets)
 
+        # set up a sane default environment
+        myenv = os.environ
+        myenv['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:' + myenv['PATH']
+
         # start the process
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        self.sshuttleprocesses[netname] = p
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=myenv)
+        self.sshuttle_pids[netname] = p
         os.set_blocking(p.stdout.fileno(), False)
         os.set_blocking(p.stderr.fileno(), False)
 
@@ -219,21 +275,21 @@ class OPVsyndeoApp(object):
         self.sshuttlefiles[netname] = open('/tmp/'+netname+'.out', 'wb')
 
     # ###########################################################
-    # destroy an sshuttle process.
+    # (model) destroy an sshuttle process.
     # ###########################################################
 
-    def killprocess (self, netname):
+    def process_kill (self, netname):
         # remove the process, kill it and wait for it.
-        if self.sshuttleprocesses[netname] is not None:
+        if self.sshuttle_pids[netname] is not None:
             try:
-                p = self.sshuttleprocesses[netname]
+                p = self.sshuttle_pids[netname]
                 p.kill()
                 outs, errs = p.communicate()
                 fp.sshuttlefiles[netname].write(outs)
                 fp.sshuttlefiles[netname].write(errs)
             except:
                 pass
-            self.sshuttleprocesses[netname] = None
+            self.sshuttle_pids[netname] = None
 
         # close the log file.
         if self.sshuttlefiles[netname] is not None:
@@ -244,7 +300,7 @@ class OPVsyndeoApp(object):
             self.sshuttlefiles[netname] = None
             
     # ###########################################################
-    # check whether a sshuttle process exists and is healthy
+    # (model) check whether a sshuttle process exists and is healthy
     # --------------------
     # returns true if the process is running and connections check out
     # returns true if the process is running and there is no connection to check
@@ -253,12 +309,12 @@ class OPVsyndeoApp(object):
     # reads all the available stdout and stderr from any running process
     # ###########################################################
 
-    def checkprocess (self, netname):
-        if self.sshuttleprocesses[netname] is None:
+    def process_check (self, netname):
+        if self.sshuttle_pids[netname] is None:
             return False
-        p = self.sshuttleprocesses[netname]
+        p = self.sshuttle_pids[netname]
         if p.poll() != None:
-            self.killprocess(netname)
+            self.process_kill(netname)
             return False
         fp = self.sshuttlefiles[netname]
         while True:
@@ -273,11 +329,11 @@ class OPVsyndeoApp(object):
 
 
     # ###########################################################
-    # if a network connection defines a test URL, test it.
+    # (model) check whether a connection is live by pulling the test URL
     # ###########################################################
 
     def checkconnection (self, netname):
-        if self.sshuttleprocesses[netname] is None: return False
+        if self.sshuttle_pids[netname] is None: return False
         try:
             testurl = self.config['networks'][netname]['testurl']
         except:
