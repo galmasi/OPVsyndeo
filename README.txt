@@ -1,7 +1,7 @@
 WTF is this?
 ============
 
-This is a macOS toolbar application that shows the status of keylime attestation in the production system.
+This is a macOS toolbar application that control sshuttle sessions.
 
 Table of contents
 =================
@@ -25,21 +25,6 @@ Table of contents
 
 * This application shows up in the mac menu bar.
 
-* The overall status of the application is red, yellow or green based
-on whether there are any red statuses on the JIRA issues it's
-following. Green means "all OK"; yellow means "cannot talk to JIRA";
-red means "something is broken".
-
-* Click on the colored ball to see details.
-
-* It is possible to set up JIRA issues into the "do not care" state by
-  clicking on them in the menu. They turn gray and stop affecting the
-  overall status.
-
-* TODO, not implemented: clicking on the "x seconds til next check"
-  announcement should cause an immediate refresh.
-  
-
 3. How to build this application
 ===============================
 
@@ -58,6 +43,5 @@ red means "something is broken".
 * run ./build.sh
 * the process (if successful) results in a DMG file in /tmp/OPVsyndeo.dmg.
 * Open the DMG by doubleclicking it; drag the application inside to "Applications" using Finder.
-* Doubleclick the application to run it. It will immediately show a yellow
 
 
