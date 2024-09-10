@@ -17,18 +17,18 @@ Per-remote-site settings include the target location's IP or hostname,
 the network ranges that should be mapped by sshuttle in each case, and
 optionally an http URL that can be checked for liveness.
 
-1. How to use this application
-   ---
+How to use this application
+---
 
-* If you want to build the code from source, please check Section 3.
+* If you want to build the code from source, please read ahead.
 
 * Download the DMG from the github releases section; open the DMG on
   your laptop and copy the application itself into the Applications
   mac folder. Then double-click it to run like you would run any
   normal mac application.
 
-1. Interactions at application runtime
-   ---
+Interactions at application runtime
+---
 
 * This application shows up in the mac menu bar.
 * Click on the network you want to activate/deactivate. Clicking toggles the network.
@@ -37,8 +37,8 @@ optionally an http URL that can be checked for liveness.
 * Networks in transient stage show up in yellow.
 * Broken connections show up in red.
 
-1. Configuration file
-   ---
+Configuration file
+---
 
 The configuration file shows up in `~/Library/Application
 Support/OPVsyndeo/OPVsyndeo.json`. If not present, OPVsyndeo will
@@ -60,8 +60,8 @@ create a reasonable default the first time it runs.
 }
 ```
 
-1. How to build OPVsyndeo
-   ---
+How to build OPVsyndeo
+---
 
 3a. Prerequisites:
 
@@ -79,8 +79,8 @@ create a reasonable default the first time it runs.
 * Open the DMG by doubleclicking it; drag the application inside to "Applications" using Finder.
 
 
-1. Todos
-   ---
+Todos
+---
 
 * Quit button should kill all networks [DONE]
 * No broken networks (no transient time out) -- needs implemented
