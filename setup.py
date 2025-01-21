@@ -13,7 +13,7 @@ DATA_FILES = [
     ('icons',glob('icons/*.png'))
 ]
 OPTIONS = {
-    'iconfile': 'icons/red.png',
+    'iconfile': 'icons/green.png',
     'packages': ['sshuttle', 'subprocess', 'urllib', 'rumps', 'packaging', 'setuptools', 'py2app']
 }
 

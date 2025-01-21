@@ -25,20 +25,20 @@ class OPVsyndeoApp(object):
         'sshuttlecmd' : 'sshuttle --disable-ipv6 --dns --python python3',
         'username'    : os.environ['USER'],
         'networks'    : {
-        'ykt': {
-            'jumphost': '9.2.130.16',
-            'nets': [ '100.64.0.0/16', '10.42.0.0/16' ],
-            'testurl': 'http://100.64.0.255/'
-        },
+            'ykt': {
+                'jumphost': '9.2.130.16',
+                'nets': [ '100.64.0.0/16', '10.42.0.0/16' ],
+                'testurl': 'http://100.64.0.255/'
+            },
             'pokstg': {
                 'jumphost':'9.47.228.15',
                 'nets': [ '192.168.92.0/22' ],
                 'testurl': 'http://192.168.92.1/'
-        },
+            },
             'pokprod': {
                 'jumphost': '9.47.228.16',
                 'nets': [ '192.168.96.0/22' ],
-                'testurl': 'http://192.168.98.10'
+                'testurl': 'http://192.168.98.10/'
             }
         }
     }
@@ -54,8 +54,21 @@ class OPVsyndeoApp(object):
 
     def __init__(self):
         self.app = rumps.App("OPVsyndeo", title="", icon='icons/gray.png', quit_button=None)
+
+        # load configuration
         self.config  = self.config_load()
-        self.config_check()
+
+        # set up a sane default environment
+        self.myenv = os.environ
+        self.myenv['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:' + self.myenv['PATH']
+
+        # check sudo privileges
+        self.config_check_sshuttle_sudo()
+
+        # check private and public keys
+        self.config_check_private_key()
+
+        # set up state
         self.shouldrun = {}
         self.menuitems = {}
         self.sshuttle_pids = {}
@@ -70,7 +83,7 @@ class OPVsyndeoApp(object):
             self.menuitems[netname]         = menuitem
             menulist.append(menuitem)
             self.shouldrun[netname]         = False
-            self.sshuttle_pids[netname] = None
+            self.sshuttle_pids[netname]     = None
             self.sshuttlefiles[netname]     = None
         # horizontal separator
         menulist.append(None)
@@ -164,37 +177,66 @@ class OPVsyndeoApp(object):
                 exit(1)
         else:
             defconfigstring = json.dumps(self.defaultconfig, indent=2)
-            rumps.alert(title="config file not found. Writing a default.",
-                        message=self.configfile,
-                        ok=None,
+            rumps.alert(title="config file not found. Writing defaults to %s as follows:"%(self.configfile),
+                        message=defconfigstring,
+                        ok="Continue",
                         cancel=None)
             try:
                 os.makedirs(self.configdir, exist_ok=True)
                 fp = open(self.configfile, 'w')
                 fp.write(defconfigstring)
                 fp.close()
+                return json.loads(defconfigstring)
             except Exception as e:
                 rumps.alert(title="Failed to write config file",
                             message=self.configfile + ": " + str(e),
-                            ok = None,
+                            ok="Exit",
                             cancel=None)
                 exit(1)
-            return self.defaultconfig
+
+    # ###########################################################
+    # check that we have the right privileges to run sshuttle
+    # ###########################################################
+
+    def config_check_sshuttle_sudo (self):
+        sudofilename='/etc/sudoers.d/sshuttle_auto'
+        if not os.path.exists(sudofilename):
+            try:
+                cmd = self.config['sshuttlecmd'].split(' ')
+                cmd.append('--sudoers-no-modify')
+                p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.myenv)
+                p.wait()
+                outs, errs = p.communicate()
+            except Exception as e:
+                rumps.alert(title="failed to run sshuttle",
+                            message="check the path to sshuttle in your configuration",
+                            ok = "Exit",
+                            cancel = None)
+                exit(1)
+            warningmessage="sshuttle needs sudo access, and your system seems to not be configured for it.\n"
+            warningmessage += "Attaching advice from the sshuttle developers below:\n\n"
+            warningmessage += str(outs.decode())
+            warningmessage += str(errs.decode())
+            retval = rumps.alert(title="sshuttle permissions check",
+                                 message=warningmessage,
+                                 ok = "Ignore & continue",
+                                 cancel = "Exit")
+            if retval != 1: exit(1)
 
     # ###########################################################
     # (model) check the configuration for consistency
     # ###########################################################
 
-    def config_check (self):
+    def config_check_private_key (self):
         if 'sshkey' not in self.config:
             rumps.alert (title="ssh key not defined in configuration",
-                         ok = None,
+                         ok = "Exit",
                          cancel = None)
             exit(1)
         if not os.access(self.config['sshkey'], os.R_OK):
             rumps.alert (title="ssh key is not readable",
                          message=self.config['sshkey'],
-                         ok = None,
+                         ok = "Exit",
                          cancel = None)
             exit(1)
         
@@ -261,12 +303,8 @@ class OPVsyndeoApp(object):
         cmd.append(username + '@' + jhost)
         cmd.extend(nets)
 
-        # set up a sane default environment
-        myenv = os.environ
-        myenv['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:' + myenv['PATH']
-
         # start the process
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=myenv)
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.myenv)
         self.sshuttle_pids[netname] = p
         os.set_blocking(p.stdout.fileno(), False)
         os.set_blocking(p.stderr.fileno(), False)
