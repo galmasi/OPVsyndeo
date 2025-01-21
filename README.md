@@ -39,6 +39,22 @@ pacify the system when it complains about security and downloads from
 the internet (rightclick -> Open might do the trick). After all this,
 double-clicking in the Launcher will work.
 
+Upon first starting up, OPVSyndeo will attempt to find a configuration
+file and create one if it can't find it. Since your SSH private keys
+may not be where OPVSyndeo is looking, you might want to shut down the
+application, edit your configuration file and then restart.
+
+sshuttle needs sudo access to run correctly. OPVSyndeo checks the
+existence of a file called /etc/sudoers.d/sshuttle_auto; if the file
+is not present OPVSyndeo queries sshuttle for what the contents of
+this file should be and presents it to the user. However, OPVSyndeo
+will *not* make this change by itself since it involves sudo privileges.
+
+*NOTE* that running sshuttle with sudo privileges is inherently
+dangerous, since a clever user could subvert the sshuttle command line
+to run basically anything with sudo privileges. Caveat
+emptor. OPVSyndeo is not any safer than sshuttle.
+
 I don't trust your binary; I want to build it myself.
 ======================================================
 
