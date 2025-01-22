@@ -1,4 +1,4 @@
-Whaat is OPVSyndeo?
+What is OPVSyndeo?
 ===================
 
 OPVsyndeo is a MacOS toolbar application that controls multiple
