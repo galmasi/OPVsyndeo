@@ -8,7 +8,9 @@ import datetime
 import rumps
 import configparser
 import py2app
+import tempfile
 import urllib.request
+import sshuttle
 
 #urllib3.disable_warnings()
 #rumps.debug_mode(True)
@@ -58,9 +60,14 @@ class OPVsyndeoApp(object):
         # load configuration
         self.config  = self.config_load()
 
-        # set up a sane default environment
+        # set up a sane default environment: put execution location into the default path
+        # python resources will be in /Applications/OPVsyndeo.app/Contents/Resources
+        myabspath=os.path.dirname(os.path.abspath(__file__))
+        resourcepath=myabspath.replace('MacOS','Resources')
         self.myenv = os.environ
-        self.myenv['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:' + self.myenv['PATH']
+        self.myenv['PATH'] = myabspath + ':' + resourcepath + ':/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:' + self.myenv['PATH']
+
+        #self.myenv['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:' + self.myenv['PATH'] 
 
         # check sudo privileges
         self.config_check_sshuttle_sudo()
@@ -199,29 +206,61 @@ class OPVsyndeoApp(object):
     # ###########################################################
 
     def config_check_sshuttle_sudo (self):
-        sudofilename='/etc/sudoers.d/sshuttle_auto'
-        if not os.path.exists(sudofilename):
-            try:
-                cmd = self.config['sshuttlecmd'].split(' ')
-                cmd.append('--sudoers-no-modify')
-                p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.myenv)
-                p.wait()
-                outs, errs = p.communicate()
-            except Exception as e:
-                rumps.alert(title="failed to run sshuttle",
-                            message="check the path to sshuttle in your configuration",
-                            ok = "Exit",
-                            cancel = None)
-                exit(1)
-            warningmessage="sshuttle needs sudo access, and your system seems to not be configured for it.\n"
-            warningmessage += "Attaching advice from the sshuttle developers below:\n\n"
-            warningmessage += str(outs.decode())
-            warningmessage += str(errs.decode())
-            retval = rumps.alert(title="sshuttle permissions check",
-                                 message=warningmessage,
-                                 ok = "Ignore & continue",
-                                 cancel = "Exit")
-            if retval != 1: exit(1)
+
+        # check whether the sshuttle_auto file exists. Nothing to do if it does.
+        sudofilename='/etc/sudoers.d/sshuttle_auto_' + os.environ['USER']
+        if os.path.exists(sudofilename): return
+
+        # figure out how the file would look like.
+        try:
+            cmd = self.config['sshuttlecmd'].split(' ')
+            cmd.append('--sudoers-no-modify')
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.myenv)
+            p.wait()
+            outs, errs = p.communicate()
+        except Exception as e:
+            rumps.alert(title="failed to run sshuttle",
+                        message="check the path to sshuttle in your configuration",
+                        ok = "Exit",
+                        cancel = None)
+            exit(1)
+        sudoers_file_content=str(outs.decode())
+
+        # pop up a message asking the user whether they want it set up.        
+        warningmessage="sshuttle needs passwordless sudo access, and your system seems to not be configured for it.\n"
+        warningmessage += "Do you want this set up now?\n\n"
+        warningmessage += "Security note: sshuttle sudo privileges can be abused. YMMV"
+        retval = rumps.alert(title="OPVSyndeo Initial Setup",
+                             message=warningmessage,
+                             ok = "Do it for me now",
+                             cancel = "Don't change my system")
+        if retval == 0: exit(0)
+
+        # generate a temporary file with the contents
+        try:
+            fp = tempfile.NamedTemporaryFile(mode='w', delete_on_close=False)
+            print('sudoers recommendation from sshuttle:\n---')
+            print(sudoers_file_content)
+            fp.write(sudoers_file_content)
+            fp.close()
+        except Exception as e:
+            rumps.alert(title="Failed to write tempfile. Giving up.",
+                        message=str(e),
+                        ok = "Exit",
+                        cancel = None)
+            exit(1)
+
+        # attempt to move file into place
+        try:
+            cmd = 'osascript -e \'do shell script "sudo mv -f ' + fp.name + ' ' + sudofilename + '" with administrator privileges\''
+            os.system(cmd)
+        except Exception as e:
+            rumps.alert(title="failed to setup sudoers file for sshuttle",
+                        message="",
+                        ok = "Exit",
+                        cancel = None)
+            print("done")
+            exit(1)
 
     # ###########################################################
     # (model) check the configuration for consistency
@@ -302,6 +341,8 @@ class OPVsyndeoApp(object):
         cmd.append('-r')
         cmd.append(username + '@' + jhost)
         cmd.extend(nets)
+
+        print(cmd)
 
         # start the process
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.myenv)
