@@ -1,4 +1,6 @@
 class Opvsyndeo < Formula
+  include Language::Python::Virtualenv
+
   desc "macOS toolbar for pre-programmed sshuttle sessions"
   homepage "https://github.com/galmasi/OPVsyndeo"
   url "https://github.com/galmasi/OPVsyndeo/archive/refs/heads/main.tar.gz"
@@ -6,11 +8,11 @@ class Opvsyndeo < Formula
   sha256 "" # Will be calculated on first release
   license ""
 
-  depends_on "python@3"
+  depends_on "python@3.12"
   depends_on "sshuttle"
 
   def install
-    python3 = "python3"
+    python3 = "python3.12"
     venv = virtualenv_create(libexec, python3)
     
     # Install Python dependencies
