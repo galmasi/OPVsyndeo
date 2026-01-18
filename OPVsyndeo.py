@@ -238,7 +238,7 @@ class OPVsyndeoApp(object):
 
         # generate a temporary file with the contents
         try:
-            fp = tempfile.NamedTemporaryFile(mode='w', delete_on_close=False)
+            fp = tempfile.NamedTemporaryFile(mode='w', delete=False)
             print('sudoers recommendation from sshuttle:\n---')
             print(sudoers_file_content)
             fp.write(sudoers_file_content)
