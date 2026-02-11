@@ -26,25 +26,63 @@ class OPVsyndeoApp(object):
         'sshoptions'  : '-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oBatchMode=yes -oPasswordAuthentication=no -oConnectTimeout=20',
         'sshuttlecmd' : 'sshuttle --disable-ipv6 --dns --python python3',
         'username'    : os.environ['USER'],
-        'networks'    : {
-            'ykt': {
-                'jumphost': '9.2.130.16',
-                'nets': [ '100.64.0.0/16', '10.42.0.0/16' ],
-                'testurl': 'http://100.64.0.255/'
-            },
-            'pokstg': {
-                'jumphost':'9.47.228.15',
-                'nets': [ '192.168.92.0/22' ],
-                'testurl': 'http://192.168.92.1/'
-            },
-            'pokprod': {
-                'jumphost': '9.47.228.16',
-                'nets': [ '192.168.96.0/22' ],
-                'testurl': 'http://192.168.98.10/'
-            }
+        'networks': {
+	    "31lab": {
+	        "jumphost": "9.2.220.22",
+	        "nets": [
+		    "10.20.0.0/16",
+		    "10.30.0.0/16"
+	        ]
+	    },
+	    "ykt": {
+	        "jumphost": "9.2.130.16",
+	        "nets": [
+		    "100.64.0.0/16",
+		    "10.42.0.0/16",
+		    "192.168.16.0/22",
+		    "192.168.252.0/22"
+	        ],
+	        "testurl": "http://100.64.0.255/"
+	    },
+	    "pokstg": {
+	        "jumphost": "9.47.228.15",
+	        "nets": [
+		    "192.168.92.0/22",
+		    "192.168.99.0/22",
+		    "192.168.189.0/24",
+		    "169.253.0.0/16"
+	        ]
+	    },
+	    "pokcicd": {
+	        "jumphost": "9.47.147.38",
+	        "nets": [
+		    "192.168.92.0/22",
+		    "192.168.88.0/22"
+	        ]
+	    },
+	    "pokprod": {
+	        "jumphost": "9.47.228.16",
+	        "nets": [
+		    "192.168.96.0/22"
+	        ],
+	        "testurl": "http://192.168.98.10/"
+	    },
+	    "qpokey": {
+	        "jumphost": "9.47.228.118",
+	        "nets": [
+		    "192.168.80.0/22",
+		    "192.168.76.0/22"
+	        ]
+	    },
+	    "gaptooth": {
+	        "jumphost": "9.47.228.121",
+	        "nets": [
+		    "192.168.76.0/22"
+	        ],
+                "testurl": "http://192.168.76.1/"
+	    }
         }
     }
-    
     # ###########################################################
     # application initialization
     # -----------------------------------------------------------
