@@ -12,9 +12,9 @@ setup(
     name='OPVsyndeo',
     version = '1.0.0',
     packages = find_packages(),
-    data_files = [
-        ('icons',glob('icons/*.png'))
-    ],
+    package_data = {
+        'OPVSyndeo': [ 'icons/*.png' ]
+    },
     install_requires = [
         'sshuttle',
         'rumps'
@@ -26,5 +26,6 @@ setup(
         'console_scripts': [
             'opvsyndeo = OPVsyndeo:OPVsyndeoApp.main'
         ]
-    }
+    },
+    include_package_data = True
 )
