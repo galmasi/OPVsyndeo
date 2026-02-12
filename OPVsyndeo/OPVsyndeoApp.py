@@ -7,7 +7,6 @@ import signal
 import datetime
 import rumps
 import configparser
-import py2app
 import tempfile
 import urllib.request
 import sshuttle
@@ -16,6 +15,14 @@ import sshuttle
 #rumps.debug_mode(True)
 
 class OPVsyndeoApp(object):
+
+    # ###########################################################
+    # main entry point
+    # ###########################################################
+
+    def main():
+        app = OPVsyndeoApp()
+        app.run()
 
     # ###########################################################
     # (model) default configuration
